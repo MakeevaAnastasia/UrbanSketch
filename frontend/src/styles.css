@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+@layer components {
+  .panel { @apply bg-white rounded-2xl shadow-sm border border-slate-200 p-6; }
+  .hint { @apply mt-6 text-sm text-slate-500 border-t border-slate-100 pt-4; }
+}

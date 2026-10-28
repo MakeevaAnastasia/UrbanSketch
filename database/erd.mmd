@@ -1,0 +1,51 @@
+erDiagram
+    PROJECT ||--o{ CONCEPT_VARIANT : contains
+    CONCEPT_VARIANT ||--o{ FINANCIAL_MODEL : has
+    FINANCIAL_MODEL ||--|| FINANCIAL_INPUT : uses
+    FINANCIAL_MODEL ||--o{ ANNUAL_ALLOCATION : plans
+    FINANCIAL_MODEL ||--o| FINANCIAL_RESULT : produces
+    FINANCIAL_MODEL ||--o{ ANNUAL_CASH_FLOW : produces
+
+    PROJECT {
+      uuid id PK
+      text name
+    }
+    CONCEPT_VARIANT {
+      uuid id PK
+      uuid project_id FK
+      text name
+      numeric residential_sale_area_m2
+      numeric commercial_sale_area_m2
+      integer parking_spaces
+    }
+    FINANCIAL_MODEL {
+      uuid id PK
+      uuid variant_id FK
+      text name
+      integer duration_years
+    }
+    FINANCIAL_INPUT {
+      uuid model_id PK,FK
+      numeric land_cost
+      numeric additional_costs
+      numeric residential_construction_area_m2
+      numeric commercial_construction_area_m2
+    }
+    ANNUAL_ALLOCATION {
+      uuid model_id FK
+      integer year_number
+      numeric expense_percent
+      numeric revenue_percent
+    }
+    FINANCIAL_RESULT {
+      uuid model_id PK,FK
+      numeric total_costs
+      numeric total_revenue
+      numeric profit
+    }
+    ANNUAL_CASH_FLOW {
+      uuid model_id FK
+      integer year_number
+      numeric net_flow
+      numeric cumulative_flow
+    }
