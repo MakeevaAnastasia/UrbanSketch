@@ -10,3 +10,19 @@ obj/
 *.user
 .vscode/
 .DS_Store
+
+# Internal customer documents: keep locally, do not publish.
+/docs/references/
+
+# Local implementation plans; not part of the deliverable.
+/docs/superpowers/
+
+# Generated caches, local databases and logs.
+*.tsbuildinfo
+*.log
+*.tmp
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
