@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:browser": "node tests/browser.integration.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1"
   },

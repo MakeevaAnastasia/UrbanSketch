@@ -1,0 +1,36 @@
+{
+  "id": "a18d9b8a-3d42-4b92-b7e0-095b3e1a0100",
+  "name": "Демонстрационный жилой комплекс",
+  "variants": [
+    {
+      "id": "a18d9b8a-3d42-4b92-b7e0-095b3e1a0101",
+      "name": "Концепция А",
+      "residentialArea": 1000,
+      "commercialArea": 200,
+      "parkingSpaces": 20,
+      "constructionResidentialArea": null,
+      "constructionCommercialArea": null,
+      "residentsCount": null,
+      "buildingsCount": null,
+      "maxFloors": null,
+      "socialAreas": null,
+      "preschoolPlaces": null,
+      "schoolPlaces": null
+    },
+    {
+      "id": "a18d9b8a-3d42-4b92-b7e0-095b3e1a0102",
+      "name": "Концепция Б",
+      "residentialArea": 900,
+      "commercialArea": 300,
+      "parkingSpaces": 25,
+      "constructionResidentialArea": null,
+      "constructionCommercialArea": null,
+      "residentsCount": null,
+      "buildingsCount": null,
+      "maxFloors": null,
+      "socialAreas": null,
+      "preschoolPlaces": null,
+      "schoolPlaces": null
+    }
+  ]
+}
