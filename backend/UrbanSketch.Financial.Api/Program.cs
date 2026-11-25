@@ -24,6 +24,7 @@ builder.Services.AddDbContext<FinancialDbContext>(options =>
     options.UseNpgsql(connectionString);
 });
 builder.Services.AddScoped<TepSeedImporter>();
+builder.Services.AddSingleton<UrbanSketch.Financial.Api.Calculations.FinancialCalculationService>();
 
 var app = builder.Build();
 
@@ -56,6 +57,7 @@ app.UseApiErrorHandling();
 app.MapProjectsEndpoints();
 app.MapConceptVariantsEndpoints();
 app.MapFinancialModelsEndpoints();
+app.MapFinancialCalculationsEndpoints();
 
 // Проверка доступности приложения; sprint — временная метка этапа, не версия API.
 // Обращение к PostgreSQL не выполняется.

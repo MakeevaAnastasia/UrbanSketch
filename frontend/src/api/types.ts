@@ -14,8 +14,8 @@ export interface ConceptVariantSummaryResponse {
 }
 
 export interface ConceptVariantDetailResponse extends ConceptVariantSummaryResponse {
-  constructionResidentialArea: number | null;
-  constructionCommercialArea: number | null;
+  constructionResidentialArea: string | null;
+  constructionCommercialArea: string | null;
   residentsCount: number | null;
   buildingsCount: number | null;
   maxFloors: number | null;

@@ -19,7 +19,9 @@ public sealed record FinancialModelResponse(
     decimal? TotalRevenue,
     decimal? Profit,
     decimal? Roi,
-    decimal? SalesProfitability);
+    decimal? SalesProfitability,
+    decimal? ConstructionResidentialAreaOverride,
+    decimal? ConstructionCommercialAreaOverride);
 
 internal static class FinancialModelResponseMapping
 {
@@ -28,7 +30,14 @@ internal static class FinancialModelResponseMapping
             m.ResidentialConstructionCost, m.CommercialConstructionCost, m.ParkingCost,
             m.ResidentialSalePrice, m.CommercialSalePrice, m.ParkingSalePrice,
             m.LandCost, m.AdditionalCosts, m.ProjectDuration,
-            m.TotalCosts, m.TotalRevenue, m.Profit, m.Roi, m.SalesProfitability);
+            m.TotalCosts, m.TotalRevenue, m.Profit, m.Roi, m.SalesProfitability,
+            m.ConstructionResidentialAreaOverride, m.ConstructionCommercialAreaOverride);
 
-    public static readonly Func<FinancialModel, FinancialModelResponse> FromEntity = Projection.Compile();
+    private static readonly Func<FinancialModel, FinancialModelResponse> Map = Projection.Compile();
+    public static FinancialModelResponse FromEntity(FinancialModel model)
+    {
+        var response = Map(model);
+        return Calculations.SavedCalculation.IsCurrent(model) ? response : response with
+        { TotalCosts=null, TotalRevenue=null, Profit=null, Roi=null, SalesProfitability=null };
+    }
 }

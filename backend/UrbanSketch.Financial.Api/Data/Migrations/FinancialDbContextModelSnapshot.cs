@@ -167,6 +167,15 @@ namespace UrbanSketch.Financial.Api.Data.Migrations
                         .HasColumnType("numeric(20,2)")
                         .HasColumnName("additional_costs");
 
+                    b.Property<string>("CalculationInputHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("calculation_input_hash");
+
+                    b.Property<string>("CalculationSnapshot")
+                        .HasColumnType("text")
+                        .HasColumnName("calculation_snapshot");
+
                     b.Property<decimal>("CommercialConstructionCost")
                         .HasPrecision(20, 2)
                         .HasColumnType("numeric(20,2)")
@@ -180,6 +189,16 @@ namespace UrbanSketch.Financial.Api.Data.Migrations
                     b.Property<Guid>("ConceptVariantId")
                         .HasColumnType("uuid")
                         .HasColumnName("variant_id");
+
+                    b.Property<decimal?>("ConstructionCommercialAreaOverride")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("construction_commercial_area_override");
+
+                    b.Property<decimal?>("ConstructionResidentialAreaOverride")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("construction_residential_area_override");
 
                     b.Property<decimal>("LandCost")
                         .HasPrecision(20, 2)

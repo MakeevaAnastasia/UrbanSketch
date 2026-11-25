@@ -25,20 +25,22 @@ internal sealed class ApiTestHost(WebApplication app, HttpClient client) : IAsyn
             if (contextFactory != null) return contextFactory();
             if (mode == TestMode.DatabaseFailure)
                 throw new InvalidOperationException("PRIVATE_DATABASE_DIAGNOSTIC_SENTINEL");
-            var options = new DbContextOptionsBuilder<FinancialDbContext>().UseNpgsql(readOnlyConnection).Options;
+            var options = new DbContextOptionsBuilder<FinancialDbContext>().UseSqlite(readOnlyConnection).Options;
             return mode switch
             {
                 TestMode.EmptyProjects => new EmptyProjectsContext(options),
                 TestMode.EmptyVariants => new EmptyVariantsContext(options),
-                _ => new FinancialDbContext(options)
+                _ => new SqliteTestContext(options)
             };
         });
+        builder.Services.AddSingleton<UrbanSketch.Financial.Api.Calculations.FinancialCalculationService>();
         var app = builder.Build();
         app.Urls.Add("http://127.0.0.1:0");
         app.UseApiErrorHandling();
         app.MapProjectsEndpoints();
         app.MapConceptVariantsEndpoints();
         app.MapFinancialModelsEndpoints();
+        app.MapFinancialCalculationsEndpoints();
         await app.StartAsync();
         var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
         return new ApiTestHost(app, new HttpClient { BaseAddress = new Uri(address) });
@@ -51,7 +53,7 @@ internal sealed class ApiTestHost(WebApplication app, HttpClient client) : IAsyn
         await app.DisposeAsync();
     }
 
-    private sealed class EmptyProjectsContext(DbContextOptions<FinancialDbContext> options) : FinancialDbContext(options)
+    private sealed class EmptyProjectsContext(DbContextOptions<FinancialDbContext> options) : SqliteTestContext(options)
     {
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -60,7 +62,7 @@ internal sealed class ApiTestHost(WebApplication app, HttpClient client) : IAsyn
         }
     }
 
-    private sealed class EmptyVariantsContext(DbContextOptions<FinancialDbContext> options) : FinancialDbContext(options)
+    private sealed class EmptyVariantsContext(DbContextOptions<FinancialDbContext> options) : SqliteTestContext(options)
     {
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

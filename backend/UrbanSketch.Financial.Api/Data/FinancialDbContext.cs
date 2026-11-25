@@ -44,6 +44,10 @@ public class FinancialDbContext(DbContextOptions<FinancialDbContext> options) : 
 
         var financialModel = modelBuilder.Entity<FinancialModel>();
         financialModel.ToTable("financial_models");
+        financialModel.Property(x => x.ConstructionResidentialAreaOverride).HasColumnName("construction_residential_area_override").HasPrecision(18, 2);
+        financialModel.Property(x => x.ConstructionCommercialAreaOverride).HasColumnName("construction_commercial_area_override").HasPrecision(18, 2);
+        financialModel.Property(x => x.CalculationInputHash).HasColumnName("calculation_input_hash").HasMaxLength(64);
+        financialModel.Property(x => x.CalculationSnapshot).HasColumnName("calculation_snapshot").HasColumnType("text");
         financialModel.HasKey(x => x.Id);
         financialModel.Property(x => x.Id).HasColumnName("id");
         financialModel.Property(x => x.ConceptVariantId).HasColumnName("variant_id");

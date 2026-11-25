@@ -1,7 +1,7 @@
 import { ApiError, invalidResponse, isGuid, requestDelete, requestJson } from './http.ts';
 import type { CreateFinancialModelRequest, FinancialModelResponse, UpdateFinancialModelRequest } from './financialTypes.ts';
 import { exactDecimal, JsonNumber, parseExactJson } from '../financial/exactJson.ts';
-import { moneyFields, normalizeMoney } from '../financial/parameters.ts';
+import { areaFields, moneyFields, normalizeArea, normalizeMoney } from '../financial/parameters.ts';
 
 function requireId(id: string) { if (!isGuid(id) || /^0{8}-0{4}-0{4}-0{4}-0{12}$/.test(id)) throw new ApiError('invalid-request', 'Выберите корректную концепцию или модель.'); }
 function decodeModel(value: unknown): FinancialModelResponse {
@@ -21,6 +21,13 @@ function decodeModel(value: unknown): FinancialModelResponse {
         ? exactDecimal(input[key].raw, 12, 4, false) : exactDecimal(input[key].raw, 20, 2, isInput);
     }
   }
+  for (const key of areaFields) {
+    if (input[key] === null) output[key] = null;
+    else {
+      if (!(input[key] instanceof JsonNumber)) throw invalidResponse();
+      output[key] = exactDecimal(input[key].raw, 18, 2);
+    }
+  }
   return output as FinancialModelResponse;
 }
 const decodeOne = (raw: string): FinancialModelResponse => decodeModel(parseExactJson(raw));
@@ -36,6 +43,10 @@ export function serializeParameters(data: UpdateFinancialModelRequest, conceptId
   if (conceptId !== undefined) requireId(conceptId);
   if (!Number.isInteger(data.projectDuration) || data.projectDuration < 1 || data.projectDuration > 2147483647) throw new ApiError('invalid-request', 'Неверный срок проекта.');
   const pairs = moneyFields.map(key => `${JSON.stringify(key)}:${normalizeMoney(data[key])}`);
+  for (const key of areaFields) {
+    // Do not omit explicit null: clearing an override differs from an old client's omitted field.
+    pairs.push(`${JSON.stringify(key)}:${data[key] === null ? 'null' : normalizeArea(data[key])}`);
+  }
   pairs.push(`"projectDuration":${data.projectDuration}`);
   if (conceptId !== undefined) pairs.push(`"conceptVariantId":${JSON.stringify(conceptId)}`);
   return '{' + pairs.join(',') + '}';

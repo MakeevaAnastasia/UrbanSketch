@@ -1,3 +1,4 @@
+import { exactDecimal, JsonNumber, parseExactJson } from '../financial/exactJson.ts';
 import type { ProjectResponse, ConceptVariantSummaryResponse, ConceptVariantDetailResponse } from './types.ts';
 
 import { ApiError, isGuid, invalidResponse, requestJson as request } from './http.ts';
@@ -13,7 +14,8 @@ const isProject = (value: unknown): value is ProjectResponse => isRecord(value) 
 const isSummary = (value: unknown): value is ConceptVariantSummaryResponse => isRecord(value) && isGuid(value.id)
   && isGuid(value.projectId) && isName(value.name) && isArea(value.residentialArea) && isArea(value.commercialArea) && isCount(value.parkingSpaces);
 const isDetail = (value: unknown): value is ConceptVariantDetailResponse => isRecord(value) && isSummary(value)
-  && ['constructionResidentialArea', 'constructionCommercialArea', 'socialAreas'].every(key => optional(value[key], isArea))
+  && ['constructionResidentialArea', 'constructionCommercialArea'].every(key => optional(value[key], v => typeof v === 'string'))
+  && optional(value.socialAreas, isArea)
   && ['residentsCount', 'buildingsCount', 'maxFloors', 'preschoolPlaces', 'schoolPlaces'].every(key => optional(value[key], isCount));
 function listOf<T extends { id: string }>(check: (v: unknown) => v is T): (v: unknown) => v is T[] {
   return (value: unknown): value is T[] => Array.isArray(value) && value.every(check)
@@ -38,7 +40,21 @@ export async function getProjectVariants(id: string, signal?: AbortSignal): Prom
 }
 export async function getConceptDetails(id: string, signal?: AbortSignal): Promise<ConceptVariantDetailResponse> {
   requireId(id);
-  const concept = await request(`/concepts/${encodeURIComponent(id)}`, isDetail, signal);
+  const concept = await request(`/concepts/${encodeURIComponent(id)}`, isDetail, signal, { decode: decodeConstructionAreas });
   if (!sameId(concept.id, id)) throw invalidResponse();
   return concept;
+}
+
+// Preserve source construction decimals before Number can lose their fractional part.
+function decodeConstructionAreas(raw: string): unknown {
+  const exact = parseExactJson(raw) as Record<string, unknown>;
+  const detail = JSON.parse(raw) as Record<string, unknown>;
+  for (const key of ['constructionResidentialArea', 'constructionCommercialArea']) {
+    if (exact[key] === null) detail[key] = null;
+    else {
+      if (!(exact[key] instanceof JsonNumber)) throw invalidResponse();
+      detail[key] = exactDecimal(exact[key].raw, 18, 2);
+    }
+  }
+  return detail;
 }

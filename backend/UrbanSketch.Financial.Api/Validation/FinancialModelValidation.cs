@@ -24,7 +24,7 @@ internal static class FinancialModelValidation
         try { input = await request.ReadFromJsonAsync<T>(JsonOptions, cancellationToken); }
         catch (JsonException)
         {
-            return InvalidBody<T>("Некорректный JSON: проверьте поля, Guid и типы. Денежные значения должны точно помещаться в numeric(20,2); неизвестные и повторяющиеся поля запрещены.");
+            return InvalidBody<T>("Некорректный JSON: проверьте поля, Guid и типы. Денежные значения должны точно помещаться в numeric(20,2), площади — в numeric(18,2); неизвестные и повторяющиеся поля запрещены.");
         }
         catch (BadHttpRequestException) { return InvalidBody<T>("Не удалось прочитать тело JSON-запроса."); }
         if (input == null) return InvalidBody<T>("Требуется объект финансовых параметров, а не null.");
@@ -44,6 +44,13 @@ internal static class FinancialModelValidation
             else if (value > 999999999999999999.99m || decimal.Round(value.Value, 2) != value.Value)
                 errors[field] = ["Значение должно точно помещаться в numeric(20,2), без округления."];
         }
+        foreach (var (field, value) in new (string, decimal?)[]
+        {
+            ("constructionResidentialAreaOverride", input.ConstructionResidentialAreaOverride),
+            ("constructionCommercialAreaOverride", input.ConstructionCommercialAreaOverride)
+        })
+            if (value is < 0 or > 9999999999999999.99m || (value.HasValue && decimal.Round(value.Value, 2) != value.Value))
+                errors[field] = ["Площадь должна быть неотрицательной и точно помещаться в numeric(18,2), без округления."];
         if (input.ProjectDuration == null) errors["projectDuration"] = ["Поле обязательно."];
         else if (input.ProjectDuration <= 0) errors["projectDuration"] = ["Продолжительность должна быть положительным целым числом лет."];
         if (input is CreateFinancialModelRequest create && (create.ConceptVariantId == null || create.ConceptVariantId == Guid.Empty))
@@ -65,6 +72,10 @@ internal static class FinancialModelValidation
         model.ParkingSalePrice = input.ParkingSalePrice!.Value;
         model.LandCost = input.LandCost!.Value;
         model.AdditionalCosts = input.AdditionalCosts!.Value;
+        if (input.HasConstructionResidentialAreaOverride)
+            model.ConstructionResidentialAreaOverride = input.ConstructionResidentialAreaOverride;
+        if (input.HasConstructionCommercialAreaOverride)
+            model.ConstructionCommercialAreaOverride = input.ConstructionCommercialAreaOverride;
         model.ProjectDuration = input.ProjectDuration!.Value;
     }
 }

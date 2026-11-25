@@ -104,9 +104,14 @@ export function useFinancialModels(conceptId: string | null) {
     const { parameters, errors } = validateDraft(source.draft);
     if (!parameters) { patch({ errors, error: 'Проверьте поля формы.', notice: '' }); return; }
     busy.current = true; patch({ busy: 'saving', error: '', errors: {}, notice: '' });
+    let createdId: string | null = null;
     try {
-      const model = source.mode === 'new' ? await createFinancialModel({ ...parameters, conceptVariantId: source.conceptId })
+      let model = source.mode === 'new' ? await createFinancialModel({ ...parameters, conceptVariantId: source.conceptId })
         : await updateFinancialModel(source.selectedId!, parameters);
+      if (source.mode === 'new') {
+        createdId = model.id;
+        model = await getFinancialModel(createdId);
+      }
       if (context.current !== source.conceptId) return;
       if (model.conceptVariantId.toLowerCase() !== source.conceptId.toLowerCase()) throw new ApiError('invalid-response', 'Ответ модели не соответствует выбранной концепции.');
       const draft = draftFromModel(model);
@@ -119,7 +124,7 @@ export function useFinancialModels(conceptId: string | null) {
       const errors: FieldErrors = {};
       if (error instanceof ApiError)
         for (const field of financialFields) if (error.validationErrors[field]) errors[field] = error.validationErrors[field].join(' ');
-      const uncertain = source.mode === 'new' && error instanceof ApiError && (error.kind === 'network' || error.kind === 'invalid-response');
+      const uncertain = source.mode === 'new' && (createdId !== null || error instanceof ApiError && (error.kind === 'network' || error.kind === 'invalid-response'));
       const general = error instanceof ApiError ? Object.entries(error.validationErrors).filter(([key]) => !financialFields.includes(key as FinancialField)).flatMap(([, values]) => values).join(' ') : '';
       patch({ errors, error: uncertain ? 'Не удалось подтвердить создание. Обновите список моделей перед повторным сохранением.' : [message(error), general].filter(Boolean).join(' '), uncertainPost: uncertain });
     } finally { busy.current = false; if (context.current === source.conceptId) patch({ busy: null }); }

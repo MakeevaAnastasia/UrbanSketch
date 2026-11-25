@@ -1,8 +1,13 @@
+import { areaSourceText } from '../financial/parameters.ts';
+import type { useConceptSelection } from '../hooks/useConceptSelection.ts';
 import type { FinancialField } from '../api/financialTypes.ts';
 import type { useFinancialModels } from '../hooks/useFinancialModels.ts';
 
-type Props = { financial: ReturnType<typeof useFinancialModels>; projectName: string | null; conceptName: string | null; onChooseConcept: () => void };
+type Props = { sourceData: ReturnType<typeof useConceptSelection>['details']; financial: ReturnType<typeof useFinancialModels>; projectName: string | null; conceptName: string | null; onChooseConcept: () => void };
 const groups: { title: string; fields: { key: FinancialField; label: string; unit: string }[] }[] = [
+  { title: 'Строительные площади', fields: [
+    { key: 'constructionResidentialAreaOverride', label: 'Строительная жилая площадь', unit: 'м²' },
+    { key: 'constructionCommercialAreaOverride', label: 'Строительная коммерческая площадь', unit: 'м²' }] },
   { title: 'Затраты на строительство', fields: [
     { key: 'residentialConstructionCost', label: 'Стоимость строительства жилья', unit: 'руб./м²' },
     { key: 'commercialConstructionCost', label: 'Стоимость строительства коммерции', unit: 'руб./м²' },
@@ -17,7 +22,14 @@ const groups: { title: string; fields: { key: FinancialField; label: string; uni
     { key: 'projectDuration', label: 'Продолжительность проекта', unit: 'лет' }] },
 ];
 const button = 'rounded-lg bg-sky-700 px-4 py-2 text-sm text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50';
-export function FinancialParametersScreen({ financial: f, projectName, conceptName, onChooseConcept }: Props) {
+export function FinancialParametersScreen({ financial: f, sourceData, projectName, conceptName, onChooseConcept }: Props) {
+  const sourceText = (key: FinancialField) => {
+    const sourceKey = key === 'constructionResidentialAreaOverride' ? 'constructionResidentialArea' : 'constructionCommercialArea';
+    if (sourceData.status === 'success' && sourceData.data.id === f.conceptId)
+      return areaSourceText(f.draft[key], sourceData.data[sourceKey]);
+    if (f.draft[key].trim()) return areaSourceText(f.draft[key], null);
+    return sourceData.status === 'error' ? 'Не удалось загрузить исходные площади концепции' : 'Загрузка исходных площадей концепции…';
+  };
   if (!f.conceptId) return <section className="panel mt-8"><p>Сначала выберите проект и концепцию на экране «Исходные данные».</p>
     <button className={button + ' mt-4'} onClick={onChooseConcept}>К исходным данным</button></section>;
   return <section className="panel mt-8">
@@ -45,13 +57,14 @@ export function FinancialParametersScreen({ financial: f, projectName, conceptNa
           <div key={field.key} className="min-w-0"><label className="mb-2 block text-sm text-slate-600" htmlFor={'finance-' + field.key}>{field.label}, {field.unit}</label>
             <input id={'finance-' + field.key} name={field.key} type="text" inputMode={field.key === 'projectDuration' ? 'numeric' : 'decimal'} autoComplete="off"
               value={f.draft[field.key]} onChange={event => f.changeField(field.key, event.target.value)} aria-invalid={Boolean(f.errors[field.key])}
-              aria-describedby={f.errors[field.key] ? 'error-' + field.key : undefined}
+              aria-describedby={[f.errors[field.key] ? 'error-' + field.key : '', field.key.endsWith('AreaOverride') ? 'source-' + field.key : ''].filter(Boolean).join(' ') || undefined}
               className={'w-full rounded-lg border bg-white p-3 text-sm focus:outline-sky-600 disabled:bg-slate-100 ' + (f.errors[field.key] ? 'border-rose-500' : 'border-slate-300')} />
+            {field.key.endsWith('AreaOverride') && <p id={'source-' + field.key} className="mt-1 text-sm text-slate-500">{sourceText(field.key)}</p>}
             {f.errors[field.key] && <p id={'error-' + field.key} className="mt-1 text-sm text-rose-700">{f.errors[field.key]}</p>}
-          </div>)}</div></div>)}</fieldset>
+          </div>)}</div>{group.title === 'Строительные площади' && <p className="hint">Строительные площади используются для расчёта затрат на строительство и могут отличаться от реализуемых площадей концепции. Пустое поле означает отсутствие пользовательского переопределения.</p>}</div>)}</fieldset>
       <div className="mt-6 flex flex-wrap gap-3"><button type="submit" className={button} disabled={Boolean(f.busy) || f.uncertainPost}>{f.busy === 'saving' ? 'Сохранение…' : 'Сохранить'}</button>
         {f.mode === 'edit' && <button type="button" onClick={() => void f.remove()} disabled={Boolean(f.busy)} className="rounded-lg border border-rose-300 px-4 py-2 text-sm text-rose-800 disabled:opacity-50">{f.busy === 'deleting' ? 'Удаление…' : 'Удалить модель'}</button>}</div>
-      <p className="hint">Введите все параметры. Ноль допускается для денежных значений; пустое поле не равно нулю. Десятичный разделитель — запятая или точка.</p>
+      <p className="hint">Введите все финансовые параметры; строительные площади необязательны. Ноль допускается для денежных значений; пустое поле не равно нулю. Десятичный разделитель — запятая или точка.</p>
     </form>}
   </section>;
 }
