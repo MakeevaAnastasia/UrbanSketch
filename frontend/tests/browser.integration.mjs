@@ -4,6 +4,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { once } from 'node:events';
+import { runResultsChecks } from './results.browser.mjs';
 import { runFinancialBrowserChecks } from './financial.browser.mjs';
 
 const url = process.env.FRONTEND_URL || 'http://127.0.0.1:5173';
@@ -109,6 +110,7 @@ try {
     await cdp('Page.navigate', { url: url + '/?browser-check=' + mode });
     await waitFor(`document.querySelector('#project-select') && window.__apiTest?.mode === ${JSON.stringify(mode)}`);
   }
+  if (!process.argv.includes('--results-only')) {
   await test('real API: automatic project selection, A and all eleven metrics', async () => {
     await load('real');
     await waitFor(metric('residentialArea', '1000м²'));
@@ -123,7 +125,7 @@ try {
     await waitFor(metric('residentialArea', '900м²'));
     assert(await evaluate(metric('commercialArea', '300м²')));
     assert(await evaluate(metric('parkingSpaces', '25шт.')));
-    for (const name of ['Финансовые параметры', 'Результаты', 'Сравнение концепций', 'Исходные данные']) {
+    for (const name of ['Финансовые параметры', 'Результаты расчёта', 'Сравнение концепций', 'Исходные данные']) {
       await clickText(name);
       await waitFor(`document.querySelector('h1')?.textContent === ${JSON.stringify(name)}`);
     }
@@ -189,6 +191,8 @@ try {
   });
   await runFinancialBrowserChecks({ cdp, evaluate, waitFor, test, select, clickText, load, project, variants, url,
     dialogs, answerDialogs: value => { acceptDialogs = value; }, ownedModels, cache });
+  }
+  await runResultsChecks({ cdp, evaluate, waitFor, test, select, clickText, load, project, variants, url, ownedModels, cache });
   assert.deepEqual(uncaught, [], 'No uncaught rendering errors');
   console.log(`Browser checks: ${passed}; failures: 0`);
   await cdp('Browser.close');

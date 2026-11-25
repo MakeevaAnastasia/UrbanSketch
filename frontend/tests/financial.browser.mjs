@@ -60,12 +60,12 @@ export async function runFinancialBrowserChecks(h) {
   await test('dirty model switching/new model/navigation require discard confirmation',async()=>{
     await setField('landCost','777');const before=dialogs.length;answerDialogs(false);
     await clickText('Создать модель');assert.equal(dialogs.length,before+1);assert.equal(await evaluate(`${input('landCost')}.value`),'777');
-    await clickText('Результаты');assert.equal(await evaluate('document.querySelector("h1").textContent'),'Финансовые параметры');
+    await clickText('Результаты расчёта');assert.equal(await evaluate('document.querySelector("h1").textContent'),'Финансовые параметры');
     const current=await evaluate('document.getElementById("financial-model-select").value');
     const alternate=await evaluate(`Array.from(document.getElementById('financial-model-select').options).find(o=>o.value&&o.value!==${JSON.stringify(current)}).value`);
     await select('financial-model-select',alternate);assert.equal(await evaluate('document.getElementById("financial-model-select").value'),current);
     assert(await evaluate(`(() => {const event=new Event('beforeunload',{cancelable:true});window.dispatchEvent(event);return event.defaultPrevented;})()`));
-    answerDialogs(true);await clickText('Результаты');await waitFor(`document.querySelector('h1').textContent==='Результаты'`);
+    answerDialogs(true);await clickText('Результаты расчёта');await waitFor(`document.querySelector('h1').textContent==='Результаты расчёта'`);
     await clickText('Финансовые параметры');assert.equal(await evaluate(`${input('landCost')}.value`),'999999999999999999,99');
   });
   await test('delete cancellation sends no DELETE; confirmed deletion clears selected ID',async()=>{
@@ -101,7 +101,7 @@ export async function runFinancialBrowserChecks(h) {
   await test('financial mobile form and unchanged results/comparison screens render correctly',async()=>{
     await scenario('empty');await waitFor(contains('У этой концепции ещё нет финансовых моделей'));await clickText('Создать модель');
     await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});assert(await evaluate('document.documentElement.scrollWidth<=window.innerWidth'));
-    for(const title of ['Результаты','Сравнение концепций','Исходные данные']){await clickText(title);await waitFor(`document.querySelector('h1').textContent===${JSON.stringify(title)}`);}
+    for(const title of ['Результаты расчёта','Сравнение концепций','Исходные данные']){await clickText(title);await waitFor(`document.querySelector('h1').textContent===${JSON.stringify(title)}`);}
     await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
   });
   await test('construction fields validate, save exact areas, clear null and preserve other model',async()=>{
@@ -123,10 +123,10 @@ export async function runFinancialBrowserChecks(h) {
     await select('financial-model-select',second);await waitFor(`${input('constructionResidentialAreaOverride')}?.value==='1200,00'`);
     await setField('constructionCommercialAreaOverride','241');answerDialogs(false);const before=dialogs.length;
     await clickText('Создать модель');assert.equal(dialogs.length,before+1);
-    await clickText('Результаты');assert.equal(await evaluate('document.querySelector("h1").textContent'),'Финансовые параметры');
+    await clickText('Результаты расчёта');assert.equal(await evaluate('document.querySelector("h1").textContent'),'Финансовые параметры');
     await select('financial-model-select',first);assert.equal(await evaluate('document.getElementById("financial-model-select").value'),second);
     assert(await evaluate(`(()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;})()`));
-    answerDialogs(true);await clickText('Результаты');
+    answerDialogs(true);await clickText('Результаты расчёта');
   });
   await test('source areas remain reference-only, override takes priority and clearing restores fallback',async()=>{
     await scenario('source');await waitFor(contains('У этой концепции ещё нет финансовых моделей'));await clickText('Создать модель');await fill();

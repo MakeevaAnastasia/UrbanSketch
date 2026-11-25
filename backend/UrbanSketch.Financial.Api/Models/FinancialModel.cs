@@ -59,6 +59,10 @@ public class FinancialModel
     [Precision(12, 4)]
     public decimal? SalesProfitability { get; set; }
 
+    public string? CalculationInputHash { get; set; }
+
+    public string? CalculationSnapshot { get; set; }
+
     public ConceptVariant ConceptVariant { get; set; } = null!;
 
     public ICollection<CashFlow> CashFlows { get; set; } = new List<CashFlow>();

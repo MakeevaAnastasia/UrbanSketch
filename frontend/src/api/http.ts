@@ -11,7 +11,7 @@ export const isGuid = (value: unknown): value is string => typeof value === 'str
 export const isAbortError = (error: unknown): boolean => error instanceof Error && error.name === 'AbortError';
 export const invalidResponse = () => new ApiError('invalid-response', 'Сервер вернул некорректные данные. Попробуйте загрузить их ещё раз.');
 const baseUrl = (import.meta.env?.VITE_API_BASE_URL?.trim() || '/api').replace(/\/+$/, '');
-interface Options { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: string; status?: number; decode?: (raw: string) => unknown }
+interface Options { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: string; status?: number; acceptedStatuses?: number[]; decode?: (raw: string) => unknown }
 async function response(path: string, signal?: AbortSignal, options: Options = {}): Promise<Response> {
   let result: Response;
   try { result = await fetch(`${baseUrl}${path}`, { method: options.method ?? 'GET', signal,
@@ -20,7 +20,7 @@ async function response(path: string, signal?: AbortSignal, options: Options = {
     if (isAbortError(error) || signal?.aborted) throw error;
     throw new ApiError('network', 'Не удалось связаться с сервером. Проверьте подключение и повторите попытку.');
   }
-  if (!result.ok) {
+  if (!result.ok && !options.acceptedStatuses?.includes(result.status)) {
     const errors: Record<string, string[]> = Object.create(null);
     if (result.status === 400) {
       try {
@@ -33,7 +33,7 @@ async function response(path: string, signal?: AbortSignal, options: Options = {
     throw new ApiError('http', result.status === 400 ? 'Проверьте введённые значения.' : result.status === 404
       ? 'Данные не найдены. Попробуйте обновить список.' : 'Сервер не смог загрузить данные. Повторите попытку позже.', result.status, errors);
   }
-  if (result.status !== (options.status ?? 200)) throw invalidResponse();
+  if (options.acceptedStatuses ? !options.acceptedStatuses.includes(result.status) : result.status !== (options.status ?? 200)) throw invalidResponse();
   return result;
 }
 export async function requestJson<T>(path: string, check: (value: unknown) => value is T, signal?: AbortSignal, options: Options = {}): Promise<T> {

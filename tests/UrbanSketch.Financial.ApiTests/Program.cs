@@ -31,6 +31,17 @@ static async Task NotFound(HttpClient client, string path)
     using var response = await client.GetAsync(path);
     Assert(response.StatusCode == HttpStatusCode.NotFound, $"Expected HTTP 404, got {(int)response.StatusCode}");
 }
+if (args is ["--calculation-postgres"])
+{
+    var testConnection = Environment.GetEnvironmentVariable("URBANSKETCH_CALCULATION_TEST_CONNECTION")
+        ?? throw new InvalidOperationException("Explicit isolated test connection required.");
+    var target = new Npgsql.NpgsqlConnectionStringBuilder(testConnection);
+    if (target.Host != "127.0.0.1" || target.Port == 5432 || target.Database != "urbansketch_migration_test")
+        throw new InvalidOperationException("Only the dedicated loopback test PostgreSQL on a separate port is allowed.");
+    await CalculationApiTests.RunAsync(Test, testConnection, true);
+    Console.WriteLine($"PostgreSQL calculation API tests: {total}; failures: {failures}");
+    return failures == 0 ? 0 : 1;
+}
 try
 {
     await using var isolatedDatabase = await LocalDatabase.CreateAsync();
@@ -112,6 +123,7 @@ try
         Assert(!json.RootElement.TryGetProperty("detail", out var detail) || detail.ValueKind == JsonValueKind.Null);
     });
     await FinancialModelTests.RunAsync(Test);
+    await CalculationApiTests.RunAsync(Test, LocalDatabase.TransactionalConnection());
     await Test("GET and rolled-back CRUD leave isolated database data unchanged", async () =>
         Assert(Enumerable.SequenceEqual(before, await LocalDatabase.SnapshotAsync(connection))));
 }

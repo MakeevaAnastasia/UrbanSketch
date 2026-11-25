@@ -44,9 +44,8 @@ public static class FinancialModelsEndpoints
     private static async Task<Results<Ok<FinancialModelResponse>, NotFound>> GetAsync(
         Guid id, FinancialDbContext db, CancellationToken cancellationToken)
     {
-        var model = await db.FinancialModels.AsNoTracking().Where(m => m.Id == id)
-            .Select(FinancialModelResponseMapping.Projection).SingleOrDefaultAsync(cancellationToken);
-        return model == null ? TypedResults.NotFound() : TypedResults.Ok(model);
+        var model = await db.FinancialModels.AsNoTracking().Include(m => m.ConceptVariant).Where(m => m.Id == id).SingleOrDefaultAsync(cancellationToken);
+        return model == null ? TypedResults.NotFound() : TypedResults.Ok(FinancialModelResponseMapping.FromEntity(model));
     }
 
     private static async Task<Results<Ok<List<FinancialModelResponse>>, NotFound>> ListAsync(
@@ -54,15 +53,15 @@ public static class FinancialModelsEndpoints
     {
         if (!await db.ConceptVariants.AsNoTracking().AnyAsync(v => v.Id == id, cancellationToken))
             return TypedResults.NotFound();
-        var models = await db.FinancialModels.AsNoTracking().Where(m => m.ConceptVariantId == id)
-            .OrderBy(m => m.Id).Select(FinancialModelResponseMapping.Projection).ToListAsync(cancellationToken);
-        return TypedResults.Ok(models);
+        var models = await db.FinancialModels.AsNoTracking().Include(m => m.ConceptVariant).Where(m => m.ConceptVariantId == id)
+            .OrderBy(m => m.Id).ToListAsync(cancellationToken);
+        return TypedResults.Ok(models.Select(FinancialModelResponseMapping.FromEntity).ToList());
     }
 
     private static async Task<Results<Ok<FinancialModelResponse>, NotFound, ValidationProblem>> UpdateAsync(
         Guid id, HttpRequest request, FinancialDbContext db, CancellationToken cancellationToken)
     {
-        var model = await db.FinancialModels.SingleOrDefaultAsync(m => m.Id == id, cancellationToken);
+        var model = await db.FinancialModels.Include(m => m.ConceptVariant).SingleOrDefaultAsync(m => m.Id == id, cancellationToken);
         if (model == null) return TypedResults.NotFound();
         var (input, errors) = await FinancialModelValidation.ReadAsync<UpdateFinancialModelRequest>(request, cancellationToken);
         if (errors.Count != 0) return TypedResults.ValidationProblem(errors);
@@ -75,7 +74,7 @@ public static class FinancialModelsEndpoints
     private static async Task<Results<NoContent, NotFound>> DeleteAsync(
         Guid id, FinancialDbContext db, CancellationToken cancellationToken)
     {
-        var model = await db.FinancialModels.SingleOrDefaultAsync(m => m.Id == id, cancellationToken);
+        var model = await db.FinancialModels.Include(m => m.ConceptVariant).SingleOrDefaultAsync(m => m.Id == id, cancellationToken);
         if (model == null) return TypedResults.NotFound();
         db.FinancialModels.Remove(model);
         try { await db.SaveChangesAsync(cancellationToken); }
