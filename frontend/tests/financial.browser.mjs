@@ -28,9 +28,9 @@ export async function runFinancialBrowserChecks(h) {
     assert.equal(await evaluate('document.querySelectorAll("form input").length'),0);
     await clickText('К исходным данным');await waitFor(`document.querySelector('h1').textContent==='Исходные данные'`);
   });
-  await test('empty models and a new blank nine-field form',async()=>{
+  await test('empty models and a new blank eleven-field form',async()=>{
     await scenario('empty');await waitFor(contains('У этой концепции ещё нет финансовых моделей'));
-    await clickText('Создать модель');await waitFor('document.querySelectorAll("form input").length===9');
+    await clickText('Создать модель');await waitFor('document.querySelectorAll("form input").length===11');
     assert(await evaluate(`Array.from(document.querySelectorAll('form input')).every(e=>e.value==='')`));
     await clickText('Сохранить');await waitFor('document.querySelectorAll("[aria-invalid=true]").length===9');
     assert.equal(await evaluate('window.__financialTest.posts'),0);
@@ -77,6 +77,7 @@ export async function runFinancialBrowserChecks(h) {
     await scenario('validation');await waitFor(contains('У этой концепции ещё нет финансовых моделей'));await clickText('Создать модель');await fill();await clickText('Сохранить');
     await waitFor(`document.getElementById('error-landCost')?.textContent.includes('Серверная ошибка суммы')`);
     assert.equal(await evaluate(`${input('residentialSalePrice')}.value`),'200000');assert(!await evaluate(contains('Финансовая модель сохранена')));
+    await waitFor(`document.getElementById('error-constructionResidentialAreaOverride')?.textContent.includes('Серверная ошибка площади')`);
   });
   await test('failed save/delete never show success or remove models optimistically',async()=>{
     await scenario('save-error');await waitFor(contains('У этой концепции ещё нет финансовых моделей'));await clickText('Создать модель');await fill();await clickText('Сохранить');await waitFor('document.querySelector("[role=alert]")');
@@ -103,38 +104,105 @@ export async function runFinancialBrowserChecks(h) {
     for(const title of ['Результаты','Сравнение концепций','Исходные данные']){await clickText(title);await waitFor(`document.querySelector('h1').textContent===${JSON.stringify(title)}`);}
     await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
   });
+  await test('construction fields validate, save exact areas, clear null and preserve other model',async()=>{
+    await scenario('empty');await waitFor(contains('У этой концепции ещё нет финансовых моделей'));await clickText('Создать модель');await fill();
+    assert(await evaluate(contains('Строительная площадь не задана')));
+    for(const value of ['-1','1.001','10000000000000000','NaN']) {await setField('constructionResidentialAreaOverride',value);await clickText('Сохранить');await waitFor(`document.getElementById('error-constructionResidentialAreaOverride')`);}
+    await setField('constructionResidentialAreaOverride','9999999999999999,99');await setField('constructionCommercialAreaOverride','0');
+    await clickText('Сохранить');await waitFor(contains('Финансовая модель сохранена'));
+    assert.equal(await evaluate(`${input('constructionResidentialAreaOverride')}.value`),'9999999999999999,99');
+    assert.equal(await evaluate(`${input('constructionCommercialAreaOverride')}.value`),'0,00');
+    assert(await evaluate(contains('Используется пользовательское значение')));
+    const first=await evaluate('document.getElementById("financial-model-select").value');
+    await clickText('Создать модель');await fill();await setField('constructionResidentialAreaOverride','1200');await setField('constructionCommercialAreaOverride','240');await clickText('Сохранить');await waitFor(contains('Финансовая модель сохранена'));
+    const second=await evaluate('document.getElementById("financial-model-select").value');
+    await select('financial-model-select',first);await waitFor(`${input('constructionResidentialAreaOverride')}?.value==='9999999999999999,99'`);
+    await setField('constructionResidentialAreaOverride','');await clickText('Сохранить');await waitFor(contains('Финансовая модель сохранена'));
+    assert(await evaluate(`window.__financialTest.lastPut.includes('"constructionResidentialAreaOverride":null')`));
+    assert.equal(await evaluate(`${input('landCost')}.value`),'50000000,00');
+    await select('financial-model-select',second);await waitFor(`${input('constructionResidentialAreaOverride')}?.value==='1200,00'`);
+    await setField('constructionCommercialAreaOverride','241');answerDialogs(false);const before=dialogs.length;
+    await clickText('Создать модель');assert.equal(dialogs.length,before+1);
+    await clickText('Результаты');assert.equal(await evaluate('document.querySelector("h1").textContent'),'Финансовые параметры');
+    await select('financial-model-select',first);assert.equal(await evaluate('document.getElementById("financial-model-select").value'),second);
+    assert(await evaluate(`(()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;})()`));
+    answerDialogs(true);await clickText('Результаты');
+  });
+  await test('source areas remain reference-only, override takes priority and clearing restores fallback',async()=>{
+    await scenario('source');await waitFor(contains('У этой концепции ещё нет финансовых моделей'));await clickText('Создать модель');await fill();
+    await waitFor(contains('Используется исходная площадь концепции: 333,25 м²'));
+    assert.equal(await evaluate(`${input('constructionResidentialAreaOverride')}.value`),'');
+    assert(await evaluate(contains('Используется исходная площадь концепции: 0,00 м²')));
+    await setField('constructionResidentialAreaOverride','0');assert(await evaluate(contains('Используется пользовательское значение')));
+    await setField('constructionResidentialAreaOverride','');await clickText('Сохранить');await waitFor(contains('Финансовая модель сохранена'));
+    assert(await evaluate(`window.__financialTest.lastPost.includes('"constructionResidentialAreaOverride":null')`));
+    assert(await evaluate(contains('Используется исходная площадь концепции: 333,25 м²')));
+  });
+  await test('failed GET after successful POST blocks duplicate creation and supports list recovery',async()=>{
+    await scenario('reread-error');await waitFor(contains('У этой концепции ещё нет финансовых моделей'));await clickText('Создать модель');await fill();
+    await setField('constructionResidentialAreaOverride','1000');await clickText('Сохранить');await waitFor(contains('Не удалось подтвердить создание'));
+    assert.equal(await evaluate('window.__financialTest.posts'),1);
+    assert(await evaluate(`Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Сохранить'&&b.disabled)`));
+    assert.equal(await evaluate(`${input('constructionResidentialAreaOverride')}.value`),'1000');
+    await evaluate('window.__financialTest.recovered=true');await clickText('Обновить список');await waitFor(`!document.getElementById('financial-model-select').disabled`);
+    const id=await evaluate('window.__financialTest.models[0].id');await select('financial-model-select',id);await waitFor(`${input('constructionResidentialAreaOverride')}?.value==='1000,00'`);
+    assert.equal(await evaluate('window.__financialTest.posts'),1);
+  });
   // Real CRUD: only server-assigned IDs observed from this browser's POST Location are cleaned up.
   answerDialogs(true);await cdp('Page.removeScriptToEvaluateOnNewDocument',{identifier:injection});injection=undefined;await load('real');
-  await test('real PostgreSQL browser create/reload/update/reopen/delete preserves exact money',async()=>{
-    await waitFor(`document.getElementById('concept-select')?.value===${JSON.stringify(variants[0].id)}`);await clickText('Финансовые параметры');await waitFor(contains('У этой концепции ещё нет финансовых моделей'));
-    await clickText('Создать модель');await fill();await clickText('Сохранить');await waitFor(contains('Финансовая модель сохранена'));
-    const id=await evaluate('document.getElementById("financial-model-select").value');assert(ownedModels.has(id),'Server Location must identify our temporary record');
-    await cdp('Page.reload');await waitFor(`document.getElementById('concept-select')?.value===${JSON.stringify(variants[0].id)}`);await clickText('Финансовые параметры');await waitFor(`${input('residentialSalePrice')}?.value==='200000,00'`);
-    await setField('residentialSalePrice','210000');await clickText('Сохранить');await waitFor(contains('Финансовая модель сохранена'));
-    await select('financial-model-select','');await select('financial-model-select',id);await waitFor(`${input('residentialSalePrice')}?.value==='210000,00'`);
-    await setField('landCost','999999999999999999,99');await clickText('Сохранить');await waitFor(contains('Финансовая модель сохранена'));
-    await select('financial-model-select','');await select('financial-model-select',id);await waitFor(`${input('landCost')}?.value==='999999999999999999,99'`);
-    await evaluate('window.scrollTo(0,0)');writeFileSync(resolve(cache,'financial-desktop.png'),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));
-    answerDialogs(false);await clickText('Удалить модель');assert.equal(await evaluate('document.getElementById("financial-model-select").value'),id);
-    answerDialogs(true);await clickText('Удалить модель');await waitFor(contains('Финансовая модель удалена'));assert.equal(await evaluate('document.getElementById("financial-model-select").value'),'');
+  await test('real PostgreSQL areas create/reload/update/clear/delete preserves existing models and TEP',async()=>{
+    const beforeModels=await Promise.all(variants.map(async v=>await (await fetch(`${h.url}/api/concepts/${v.id}/financial-models`)).text()));
+    const beforeTep=await Promise.all(variants.map(async v=>await (await fetch(`${h.url}/api/concepts/${v.id}`)).text()));
+    await waitFor(`document.getElementById('concept-select')?.value===${JSON.stringify(variants[0].id)}`);
+    await clickText('Финансовые параметры');await waitFor(`Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Создать модель'&&!b.disabled)`);
+    await clickText('Создать модель');await fill(['100000','80000','500000','200000','150000','1000000','14000000','10000000','3']);
+    await setField('constructionResidentialAreaOverride','1000');await setField('constructionCommercialAreaOverride','200');
+    await clickText('Сохранить');await waitFor(contains('Финансовая модель сохранена'));
+    const id=await evaluate('document.getElementById("financial-model-select").value');assert(ownedModels.has(id),'POST Location must identify owned temporary record');
+    await cdp('Page.reload');await waitFor(`document.getElementById('concept-select')?.value===${JSON.stringify(variants[0].id)}`);
+    await clickText('Финансовые параметры');await waitFor(`Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Создать модель'&&!b.disabled)`);
+    await select('financial-model-select',id);await waitFor(`${input('constructionResidentialAreaOverride')}?.value==='1000,00'`);
+    assert.equal(await evaluate(`${input('constructionCommercialAreaOverride')}.value`),'200,00');
+    await setField('constructionResidentialAreaOverride','1200');await setField('constructionCommercialAreaOverride','240');await clickText('Сохранить');await waitFor(contains('Финансовая модель сохранена'));
+    await select('financial-model-select','');await select('financial-model-select',id);await waitFor(`${input('constructionResidentialAreaOverride')}?.value==='1200,00'`);
+    assert.equal(await evaluate(`${input('constructionCommercialAreaOverride')}.value`),'240,00');
+    await setField('constructionResidentialAreaOverride','');await clickText('Сохранить');await waitFor(contains('Финансовая модель сохранена'));
+    const cleared=await (await fetch(`${h.url}/api/financial-models/${id}`)).json();
+    assert.equal(cleared.constructionResidentialAreaOverride,null);assert.equal(cleared.constructionCommercialAreaOverride,240);assert.equal(cleared.landCost,14000000);
+    for(const width of [390,768,1440]) {
+      await cdp('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:width===390});
+      assert(await evaluate('document.documentElement.scrollWidth<=window.innerWidth'));
+      assert(await evaluate(`Array.from(document.querySelectorAll('form input')).every(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth;})`));
+      writeFileSync(resolve(cache,`construction-areas-${width}.png`),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));
+    }
+    answerDialogs(true);await clickText('Удалить модель');await waitFor(contains('Финансовая модель удалена'));
     assert.equal((await fetch(`${h.url}/api/financial-models/${id}`)).status,404);
+    const afterModels=await Promise.all(variants.map(async v=>await (await fetch(`${h.url}/api/concepts/${v.id}/financial-models`)).text()));
+    const afterTep=await Promise.all(variants.map(async v=>await (await fetch(`${h.url}/api/concepts/${v.id}`)).text()));
+    assert.deepEqual(afterModels,beforeModels);assert.deepEqual(afterTep,beforeTep);
   });
 }
 
 function mockFinancial({mode,conceptA,conceptB}) {
   const original=window.fetch.bind(window);
   const money=['residentialConstructionCost','commercialConstructionCost','parkingCost','residentialSalePrice','commercialSalePrice','parkingSalePrice','landCost','additionalCosts'];
-  const make=(id)=>({id,conceptVariantId:conceptA,...Object.fromEntries(money.map(key=>[key,'1000.00'])),projectDuration:3,totalCosts:null,totalRevenue:null,profit:null,roi:null,salesProfitability:null});
+  const make=(id)=>({constructionResidentialAreaOverride:null,constructionCommercialAreaOverride:null,id,conceptVariantId:conceptA,...Object.fromEntries(money.map(key=>[key,'1000.00'])),projectDuration:3,totalCosts:null,totalRevenue:null,profit:null,roi:null,salesProfitability:null});
   window.__financialTest={mode,recovered:false,models:['race','detail-error','delete-error'].includes(mode)?[make('a18d9b8a-3d42-4b92-b7e0-095b3e1a0301'),make('a18d9b8a-3d42-4b92-b7e0-095b3e1a0302')]:[],posts:0,puts:0,deletes:0,lastPost:'',lastPut:''};
-  const raw=model=>'{'+Object.entries(model).map(([key,value])=>JSON.stringify(key)+':'+(money.includes(key)?value:JSON.stringify(value))).join(',')+'}';
+  const raw=model=>'{'+Object.entries(model).map(([key,value])=>JSON.stringify(key)+':'+((money.includes(key)||key.endsWith('AreaOverride'))&&value!==null?value:JSON.stringify(value))).join(',')+'}';
   const answer=(model,status=200)=>new Response(Array.isArray(model)?'['+model.map(raw).join(',')+']':raw(model),{status,headers:{'Content-Type':'application/json'}});
   window.fetch=async(input,options={})=>{
     const path=new URL(typeof input==='string'?input:input.url,location.href).pathname, method=options.method||'GET';
     const list=path.match(/^\/api\/concepts\/([^/]+)\/financial-models$/), detail=path.match(/^\/api\/financial-models\/([^/]+)$/);
-    if(!list&&!detail&&path!=='/api/financial-models')return original(input,options);
+    if(!list&&!detail&&path!=='/api/financial-models'){
+      const response=await original(input,options);
+      if(mode==='source'&&path===`/api/concepts/${conceptA}`) {
+        const source=await response.json();return Response.json({...source,constructionResidentialArea:333.25,constructionCommercialArea:0});
+      }
+      return response;
+    }
     const state=window.__financialTest;
     if(mode==='list-error'&&list&&!state.recovered)throw new TypeError('private network error');
-    if(mode==='detail-error'&&detail&&method==='GET'&&!state.recovered)return Response.json({status:404},{status:404});
+    if((mode==='detail-error'||mode==='reread-error')&&detail&&method==='GET'&&!state.recovered)return Response.json({status:404},{status:404});
     if(list){if(mode==='race'&&list[1]===conceptB)await new Promise(r=>setTimeout(r,200));return answer(state.models.filter(m=>m.conceptVariantId===list[1]));}
     if(method==='GET'){
       const model=state.models.find(m=>m.id===detail[1]);
@@ -146,7 +214,7 @@ function mockFinancial({mode,conceptA,conceptB}) {
       state.models=state.models.filter(m=>m.id!==detail[1]);return new Response(null,{status:204});
     }
     if(method==='POST')state.posts++;else state.puts++;
-    if(mode==='validation')return Response.json({status:400,errors:{landCost:['Серверная ошибка суммы']}},{status:400});
+    if(mode==='validation')return Response.json({status:400,errors:{landCost:['Серверная ошибка суммы'],constructionResidentialAreaOverride:['Серверная ошибка площади']}},{status:400});
     if(mode==='save-error')return Response.json({detail:'PRIVATE_SAVE_ERROR'},{status:500});
     const body=options.body;
     if(method==='POST')state.lastPost=body;else state.lastPut=body;
@@ -155,7 +223,8 @@ function mockFinancial({mode,conceptA,conceptB}) {
     const existing=detail&&state.models.find(m=>m.id===detail[1]);
     const id=existing?.id||'a18d9b8a-3d42-4b92-b7e0-'+String(300+state.posts).padStart(12,'0');
     const cid=method==='POST'?body.match(/"conceptVariantId"\s*:\s*"([^"]+)"/)[1]:existing.conceptVariantId;
-    const model={...make(id),...values,projectDuration:duration,conceptVariantId:cid};
+    const areas=Object.fromEntries(['constructionResidentialAreaOverride','constructionCommercialAreaOverride'].map(key=>{const raw=body.match(new RegExp('\"'+key+'\"\\s*:\\s*(null|[\\d.]+)'))?.[1];return [key,raw==='null'||raw===undefined?null:raw];}));
+    const model={...make(id),...values,...areas,projectDuration:duration,conceptVariantId:cid};
     await new Promise(r=>setTimeout(r,100));state.models=[...state.models.filter(m=>m.id!==id),model];return answer(model,method==='POST'?201:200);
   };
 }

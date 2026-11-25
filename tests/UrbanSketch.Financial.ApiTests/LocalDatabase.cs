@@ -1,43 +1,47 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.Configuration;
-using Npgsql;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using UrbanSketch.Financial.Api.Data;
+using UrbanSketch.Financial.Api.Models;
 
-internal static class LocalDatabase
+// Ephemeral relational fixture; never opens PostgreSQL or loads secrets.
+internal sealed class LocalDatabase(SqliteConnection keeper) : IAsyncDisposable
 {
-    public static string ReadOnlyConnection() => Connection(true);
-
-    public static string TransactionalConnection() => Connection(false);
-
-    private static string Connection(bool readOnly)
+    private static string connectionString = "";
+    public static string ReadOnlyConnection() => connectionString;
+    public static string TransactionalConnection() => connectionString;
+    public static async Task<LocalDatabase> CreateAsync()
     {
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        connectionString = $"Data Source=api-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+        var keeper = new SqliteConnection(connectionString);
+        await keeper.OpenAsync();
+        var fixture = new LocalDatabase(keeper);
+        try
         {
-            ApplicationName = typeof(FinancialDbContext).Assembly.FullName,
-            ContentRootPath = Path.GetFullPath("backend/UrbanSketch.Financial.Api"),
-            EnvironmentName = "Development"
-        });
-        var connection = new NpgsqlConnectionStringBuilder(builder.Configuration.GetConnectionString("DefaultConnection"));
-        if (connection.Host != "127.0.0.1" || connection.Port != 5432 || connection.Database != "urbansketch_financial")
-            throw new InvalidOperationException("API tests require the confirmed local project database.");
-        if (readOnly) connection.Options = (connection.Options + " -c default_transaction_read_only=on").Trim();
-        connection.ApplicationName = readOnly ? "UrbanSketch.ApiReadOnlyTests" : "UrbanSketch.ApiTransactionTests";
-        return connection.ConnectionString;
-    }
-
-    public static async Task<string[]> SnapshotAsync(string readOnlyConnection)
-    {
-        await using var connection = new NpgsqlConnection(readOnlyConnection);
-        await connection.OpenAsync();
-        await using (var guard = new NpgsqlCommand("SHOW default_transaction_read_only", connection))
-            if ((string?)await guard.ExecuteScalarAsync() != "on") throw new InvalidOperationException("Read-only guard is not active.");
-        var snapshot = new List<string>();
-        foreach (var table in new[] { "projects", "concept_variants", "financial_models", "cash_flows", "\"__EFMigrationsHistory\"" })
-        {
-            var key = table.StartsWith('"') ? "\"MigrationId\"" : "id";
-            await using var command = new NpgsqlCommand($"SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY {key})::text, '[]') FROM public.{table} t", connection);
-            snapshot.Add((string)(await command.ExecuteScalarAsync())!);
+            await using var db = new SqliteTestContext(new DbContextOptionsBuilder<FinancialDbContext>().UseSqlite(connectionString).Options);
+            await db.Database.EnsureCreatedAsync();
+            var project = new Project { Id = Guid.Parse("a18d9b8a-3d42-4b92-b7e0-095b3e1a0100"), Name = "Демонстрационный жилой комплекс" };
+            db.Projects.Add(project);
+            db.ConceptVariants.AddRange(
+                new ConceptVariant { Id = Guid.Parse("a18d9b8a-3d42-4b92-b7e0-095b3e1a0101"), Project = project, Name = "Концепция А", ResidentialArea = 1000, CommercialArea = 200, ParkingSpaces = 20 },
+                new ConceptVariant { Id = Guid.Parse("a18d9b8a-3d42-4b92-b7e0-095b3e1a0102"), Project = project, Name = "Концепция Б", ResidentialArea = 900, CommercialArea = 300, ParkingSpaces = 25 });
+            await db.SaveChangesAsync();
+            return fixture;
         }
-        return snapshot.ToArray();
+        catch { await fixture.DisposeAsync(); throw; }
     }
+    public static async Task<string[]> SnapshotAsync(string connectionString)
+    {
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync();
+        var rows = new List<string>();
+        foreach (var table in new[] { "projects", "concept_variants", "financial_models", "cash_flows" })
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"SELECT * FROM {table} ORDER BY id";
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync()) rows.Add(table + System.Text.Json.JsonSerializer.Serialize(Enumerable.Range(0, reader.FieldCount).Select(i => reader.GetValue(i)).ToArray()));
+        }
+        return rows.ToArray();
+    }
+    public async ValueTask DisposeAsync() => await keeper.DisposeAsync();
 }

@@ -33,6 +33,7 @@ static async Task NotFound(HttpClient client, string path)
 }
 try
 {
+    await using var isolatedDatabase = await LocalDatabase.CreateAsync();
     var connection = LocalDatabase.ReadOnlyConnection();
     var before = await LocalDatabase.SnapshotAsync(connection);
     await using var normal = await ApiTestHost.StartAsync(connection);
@@ -111,12 +112,12 @@ try
         Assert(!json.RootElement.TryGetProperty("detail", out var detail) || detail.ValueKind == JsonValueKind.Null);
     });
     await FinancialModelTests.RunAsync(Test);
-    await Test("GET and rolled-back CRUD leave PostgreSQL data and history unchanged", async () =>
+    await Test("GET and rolled-back CRUD leave isolated database data unchanged", async () =>
         Assert(Enumerable.SequenceEqual(before, await LocalDatabase.SnapshotAsync(connection))));
 }
 catch (Exception ex)
 {
-    Console.Error.WriteLine($"API test setup failed: {ex.GetType().Name}. Check local PostgreSQL and Development User Secrets; sensitive details suppressed.");
+    Console.Error.WriteLine($"API test setup failed: {ex.GetType().Name}. Check isolated SQLite fixture and test host; sensitive details suppressed.");
     return 2;
 }
 Console.WriteLine($"API tests: {total}; failures: {failures}");

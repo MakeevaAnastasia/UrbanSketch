@@ -181,6 +181,16 @@ namespace UrbanSketch.Financial.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("variant_id");
 
+                    b.Property<decimal?>("ConstructionCommercialAreaOverride")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("construction_commercial_area_override");
+
+                    b.Property<decimal?>("ConstructionResidentialAreaOverride")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("construction_residential_area_override");
+
                     b.Property<decimal>("LandCost")
                         .HasPrecision(20, 2)
                         .HasColumnType("numeric(20,2)")

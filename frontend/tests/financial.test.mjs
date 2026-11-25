@@ -30,7 +30,7 @@ test('maximum valid duration and monetary boundary are accepted exactly', () => 
 const cid='a18d9b8a-3d42-4b92-b7e0-095b3e1a0101', mid='a18d9b8a-3d42-4b92-b7e0-095b3e1a0301';
 const parameters=()=>validateDraft(draft()).parameters;
 function rawModel(money='999999999999999999.99') {
-  return '{"id":"'+mid+'","conceptVariantId":"'+cid+'",'+fields.map(key=>JSON.stringify(key)+':'+money).join(',')+',"projectDuration":3,"totalCosts":null,"totalRevenue":null,"profit":null,"roi":null,"salesProfitability":null}';
+  return '{"id":"'+mid+'","conceptVariantId":"'+cid+'",'+fields.map(key=>JSON.stringify(key)+':'+money).join(',')+',"projectDuration":3,"totalCosts":null,"totalRevenue":null,"profit":null,"roi":null,"salesProfitability":null,"constructionResidentialAreaOverride":null,"constructionCommercialAreaOverride":null}';
 }
 const rawResponse=(raw,status=200)=>new Response(raw,{status,headers:{'Content-Type':'application/json'}});
 test('response numbers are retained before any Number conversion', () => {

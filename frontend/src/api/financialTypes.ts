@@ -1,8 +1,9 @@
 // Wire DTO decimals are JSON numbers; the client keeps exact decimal text instead of Number.
 export type MoneyField = 'residentialConstructionCost' | 'commercialConstructionCost' | 'parkingCost'
   | 'residentialSalePrice' | 'commercialSalePrice' | 'parkingSalePrice' | 'landCost' | 'additionalCosts';
-export type FinancialField = MoneyField | 'projectDuration';
-export type UpdateFinancialModelRequest = Record<MoneyField, string> & { projectDuration: number };
+export type AreaField = 'constructionResidentialAreaOverride' | 'constructionCommercialAreaOverride';
+export type FinancialField = MoneyField | AreaField | 'projectDuration';
+export type UpdateFinancialModelRequest = Record<MoneyField, string> & Record<AreaField, string | null> & { projectDuration: number };
 export type CreateFinancialModelRequest = UpdateFinancialModelRequest & { conceptVariantId: string };
 export type FinancialModelResponse = UpdateFinancialModelRequest & {
   id: string;

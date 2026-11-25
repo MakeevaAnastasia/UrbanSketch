@@ -8,6 +8,12 @@ public class FinancialModel
 
     public Guid ConceptVariantId { get; set; }
 
+    [Precision(18, 2)]
+    public decimal? ConstructionResidentialAreaOverride { get; set; }
+
+    [Precision(18, 2)]
+    public decimal? ConstructionCommercialAreaOverride { get; set; }
+
     // Construction costs and sale prices are per square metre or per parking space.
     [Precision(20, 2)]
     public decimal ResidentialConstructionCost { get; set; }

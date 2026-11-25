@@ -2,7 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
+using Microsoft.Data.Sqlite;
 using UrbanSketch.Financial.Api.Data;
 using UrbanSketch.Financial.Api.Models;
 
@@ -53,13 +53,13 @@ internal static class FinancialModelTests
 
     public static async Task RunAsync(Func<string, Func<Task>, Task> test)
     {
-        await using var connection = new NpgsqlConnection(LocalDatabase.TransactionalConnection());
+        await using var connection = new SqliteConnection(LocalDatabase.TransactionalConnection());
         await connection.OpenAsync();
         await using var transaction = await connection.BeginTransactionAsync();
         FinancialDbContext Context()
         {
-            var context = new FinancialDbContext(new DbContextOptionsBuilder<FinancialDbContext>()
-                .UseNpgsql(connection, contextOwnsConnection: false).Options);
+            var context = new SqliteTestContext(new DbContextOptionsBuilder<FinancialDbContext>()
+                .UseSqlite(connection, contextOwnsConnection: false).Options);
             context.Database.UseTransaction(transaction);
             return context;
         }
@@ -79,7 +79,7 @@ internal static class FinancialModelTests
                 Assert(result.Json.GetProperty("residentialConstructionCost").GetDecimal() == 100000m);
                 UnknownResults(result.Json);
             });
-            await test("GET reads created financial model from PostgreSQL", async () =>
+            await test("GET reads created financial model from isolated relational database", async () =>
             {
                 var result = await Send(client, HttpMethod.Get, $"/api/financial-models/{first}");
                 Assert(result.Status == HttpStatusCode.OK && result.Json.GetProperty("id").GetGuid() == first);
@@ -132,6 +132,7 @@ internal static class FinancialModelTests
                     AssertParameters(untouched.Json, Parameters);
                 }
             });
+            await ConstructionAreaTests.RunAsync(test, client, first, second, Context);
             var invalid = new Dictionary<string, string>
             {
                 ["negative construction cost"] = Create().Replace("\"residentialConstructionCost\":100000", "\"residentialConstructionCost\":-1"),
